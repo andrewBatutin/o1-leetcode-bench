@@ -1,18 +1,18 @@
-To solve the problem of maximizing the number of moves made by Alice and Bob while capturing pawns on a chessboard, we can use a recursive approach with memoization. The key idea is to simulate the game where Alice tries to maximize the total moves while Bob tries to minimize them.
+To solve the problem of maximizing the number of moves made by Alice and Bob while capturing pawns on a chessboard, we can use a recursive approach with memoization. The key steps involve calculating the minimum moves required for the knight to capture each pawn and then simulating the game where both players play optimally.
 
 Here's a step-by-step breakdown of the solution:
 
-1. **Knight's Moves**: Define the possible moves of a knight in chess. The knight can move in an "L" shape, which gives it 8 possible positions to move to.
+1. **Calculate Knight Moves**: We need a function to calculate the minimum number of moves required for the knight to reach a specific pawn position using Breadth-First Search (BFS).
 
-2. **Distance Calculation**: Create a function to calculate the minimum number of moves required for the knight to reach a specific pawn using Breadth-First Search (BFS). This will help us determine how many moves it takes for Alice or Bob to capture a pawn.
+2. **Game Simulation**: We will use a recursive function to simulate the game. Alice will try to maximize the total moves, while Bob will try to minimize them. We will keep track of which pawns are still available using a bitmask.
 
-3. **Game Simulation**: Use a recursive function to simulate the game. The function will take the current position of the knight, the remaining pawns, and the turn (whether it's Alice's or Bob's). Depending on whose turn it is, the function will either maximize or minimize the total moves.
+3. **Memoization**: To avoid recalculating results for the same state, we will use memoization.
 
-4. **Memoization**: Store results of previously computed states to avoid redundant calculations and improve efficiency.
+4. **Base Case**: If there are no pawns left, the game ends, and we return 0.
 
-5. **Base Case**: If there are no pawns left, return 0 since no more moves can be made.
+5. **Recursive Case**: For each pawn, calculate the moves required to capture it, and then recursively call the function for the remaining pawns.
 
-Here is the complete Python solution implementing the above logic:
+Here is the complete Python solution:
 
 ```python
 from collections import deque
@@ -26,17 +26,14 @@ class Solution(object):
         :type positions: List[List[int]]
         :rtype: int
         """
-        # Knight's possible moves
+        # Directions a knight can move
         knight_moves = [
             (2, 1), (2, -1), (-2, 1), (-2, -1),
             (1, 2), (1, -2), (-1, 2), (-1, -2)
         ]
         
         # Function to calculate minimum moves to reach a pawn
-        def min_moves(start, target):
-            if start == target:
-                return 0
-            
+        def bfs(start, target):
             queue = deque([start])
             visited = set()
             visited.add(start)
@@ -45,44 +42,39 @@ class Solution(object):
             while queue:
                 for _ in range(len(queue)):
                     x, y = queue.popleft()
+                    if (x, y) == target:
+                        return moves
                     for dx, dy in knight_moves:
                         nx, ny = x + dx, y + dy
                         if 0 <= nx < 50 and 0 <= ny < 50 and (nx, ny) not in visited:
-                            if (nx, ny) == target:
-                                return moves + 1
                             visited.add((nx, ny))
                             queue.append((nx, ny))
                 moves += 1
             
-            return float('inf')  # Should not reach here if the target is valid
+            return float('inf')  # Should not happen as pawns are reachable
         
-        # Precompute the distances from the knight to each pawn
-        distances = []
+        # Precompute the moves required to capture each pawn
+        pawn_moves = []
         for pos in positions:
-            distances.append(min_moves((kx, ky), tuple(pos)))
+            moves = bfs((kx, ky), tuple(pos))
+            pawn_moves.append(moves)
         
-        # Memoization for the recursive function
+        n = len(positions)
+        
         @lru_cache(None)
-        def dfs(remaining_mask):
-            remaining_positions = [positions[i] for i in range(len(positions)) if (remaining_mask & (1 << i)) != 0]
-            if not remaining_positions:
-                return 0
-            
-            max_moves = 0
-            
-            # Alice's turn
-            for i in range(len(remaining_positions)):
-                pawn_distance = distances[i]
-                new_mask = remaining_mask & ~(1 << i)  # Remove the pawn from the mask
-                # Calculate moves if Alice captures this pawn
-                moves = pawn_distance + dfs(new_mask)
-                max_moves = max(max_moves, moves)
-            
-            return max_moves
+        def dp(mask):
+            total_moves = 0
+            for i in range(n):
+                if mask & (1 << i):  # If pawn i is still available
+                    # Calculate the new mask after capturing pawn i
+                    new_mask = mask & ~(1 << i)
+                    # Total moves is the moves to capture this pawn + the result of the next state
+                    total_moves = max(total_moves, pawn_moves[i] + dp(new_mask))
+            return total_moves
         
-        # Start the game with all pawns available
-        initial_mask = (1 << len(positions)) - 1
-        return dfs(initial_mask)
+        # Start with all pawns available (mask with all bits set)
+        initial_mask = (1 << n) - 1
+        return dp(initial_mask)
 
 # Example usage:
 solution = Solution()
@@ -92,7 +84,8 @@ print(solution.maxMoves(0, 0, [[1, 2], [2, 4]]))  # Output: 3
 ```
 
 ### Explanation of the Code:
-- The `min_moves` function calculates the minimum moves required for the knight to reach a specific pawn using BFS.
-- The `dfs` function recursively explores all possible moves, keeping track of which pawns are still available using a bitmask.
-- The `lru_cache` decorator is used to memoize results of the `dfs` function to optimize performance.
-- Finally, the solution is tested with the provided examples.
+- The `bfs` function calculates the minimum moves required for the knight to reach a pawn using BFS.
+- The `dp` function uses memoization to store results for different states of the game represented by a bitmask.
+- The main function initializes the game and starts the recursive simulation with all pawns available. 
+
+This approach ensures that both players play optimally, and we can compute the maximum number of moves Alice can achieve.

@@ -1,28 +1,49 @@
-To solve the problem, we need to simulate the game between Alice and Bob on a 50x50 chessboard where a knight captures pawns. The goal is to maximize the total number of moves made by both players until all pawns are captured, with Alice trying to maximize and Bob trying to minimize this total.
+To solve the problem of determining the maximum total number of moves Alice can achieve when she and Bob take turns capturing pawns with a knight on a 50x50 chessboard, we can use a dynamic programming (DP) approach with memoization. Here's a step-by-step explanation of the solution:
 
-Here's a step-by-step strategy to solve the problem:
+### Step-by-Step Explanation
 
-1. **Precompute Minimum Moves**:
-    - First, calculate the minimum number of moves the knight requires to reach any pawn from any other pawn or from the starting position. This is done using Breadth-First Search (BFS).
-    - We precompute these distances and store them in a matrix to avoid recalculating them multiple times during the game simulation.
+1. **Understanding the Problem:**
+   - We have a knight starting at position `(kx, ky)` on a 50x50 chessboard.
+   - There are up to 15 pawns placed on the board.
+   - Alice and Bob take turns to capture pawns. Alice aims to maximize the total number of moves, while Bob aims to minimize it.
+   - The knight can move in an "L" shape: two cells in one direction and then one cell perpendicular to that.
 
-2. **Game Simulation with Dynamic Programming (DP)**:
-    - Use Dynamic Programming with memoization to simulate the game.
-    - The state of the game can be represented by the current position of the knight and the set of remaining pawns (using a bitmask).
-    - Depending on whose turn it is (Alice's or Bob's), the player will choose a pawn to capture that either maximizes or minimizes the total number of moves.
-    - Memoization helps in storing the results of subproblems to avoid redundant calculations, making the solution efficient even for larger inputs.
+2. **Dynamic Programming Approach:**
+   - We need to consider all possible states where:
+     - The knight is at a certain position.
+     - A subset of pawns remains to be captured.
+     - It's either Alice's or Bob's turn.
+   - Each state can be represented by:
+     - `last_pos_index`: The index of the knight's current position (starting position is index 0, and pawns are indexed from 1 to n).
+     - `mask`: A bitmask representing which pawns are still on the board.
+   - We use memoization to store the results of subproblems to avoid redundant calculations.
 
-3. **Handling Player Turns**:
-    - Determine whose turn it is based on the number of pawns already captured. If an even number of pawns have been captured, it's Alice's turn; otherwise, it's Bob's turn.
+3. **Precomputing Distances:**
+   - We precompute the minimum number of moves required for the knight to reach each pawn from every other pawn (including the starting position).
+   - This is done using Breadth-First Search (BFS) for each position to compute the shortest path to all other relevant positions.
 
-4. **Edge Cases**:
-    - Ensure that all edge cases are handled, such as when there is only one pawn or when the knight is already on a pawn's position.
+4. **Recursive DP Function:**
+   - The `dp` function calculates the maximum total number of moves based on the current state `(last_pos, mask)`.
+   - If it's Alice's turn, she will choose the move that maximizes the total number of moves.
+   - If it's Bob's turn, he will choose the move that minimizes the total number of moves.
+   - The function recursively explores all possible moves and uses memoization to store intermediate results.
 
-Here's the Python implementation of the solution:
+5. **Handling the Game Turns:**
+   - The turn alternates between Alice and Bob based on the number of pawns captured so far.
+   - Alice starts the game, so if the number of pawns captured is even, it's Alice's turn; otherwise, it's Bob's.
+
+6. **Final Calculation:**
+   - We start the DP from the initial position with all pawns on the board.
+   - The DP function explores all possible sequences of capturing pawns, considering both Alice's and Bob's optimal strategies.
+
+### Python Implementation
+
+Below is the Python implementation of the above approach:
 
 ```python
 from collections import deque
-from functools import lru_cache
+import sys
+sys.setrecursionlimit(1 << 25)
 
 class Solution(object):
     def maxMoves(self, kx, ky, positions):
@@ -32,112 +53,109 @@ class Solution(object):
         :type positions: List[List[int]]
         :rtype: int
         """
-        # Define all positions: start + pawns
-        pos_list = [(kx, ky)] + [tuple(p) for p in positions]
         n = len(positions)
-        
-        # Precompute min_moves[i][j] using BFS
-        min_moves = [[-1] * (n + 1) for _ in range(n + 1)]
-        
-        # Directions for knight moves
-        dirs = [(-2, -1), (-1, -2), (-2, 1), (-1, 2),
-                (1, -2), (2, -1), (1, 2), (2, 1)]
-        
-        def bfs(start_idx):
-            start = pos_list[start_idx]
-            queue = deque()
+        positions_list = [(kx, ky)] + [tuple(p) for p in positions]  # index 0 is start
+        # Precompute distances between all positions using BFS
+        distances = [ [0]*(n+1) for _ in range(n+1) ]
+
+        # Possible knight moves
+        moves = [ (2,1), (1,2), (-1,2), (-2,1), (-2,-1), (-1,-2), (1,-2), (2,-1) ]
+
+        # Precompute BFS distances
+        for i in range(n+1):
+            start_x, start_y = positions_list[i]
+            # BFS from (start_x, start_y)
             visited = [[-1 for _ in range(50)] for _ in range(50)]
-            x0, y0 = start
-            queue.append((x0, y0))
-            visited[x0][y0] = 0
-            while queue:
-                x, y = queue.popleft()
-                for dx, dy in dirs:
+            q = deque()
+            q.append( (start_x, start_y) )
+            visited[start_x][start_y] = 0
+            targets = set(range(n+1))
+            targets.remove(i)
+            while q and targets:
+                x, y = q.popleft()
+                d = visited[x][y]
+                for dx, dy in moves:
                     nx, ny = x + dx, y + dy
                     if 0 <= nx < 50 and 0 <= ny < 50 and visited[nx][ny] == -1:
-                        visited[nx][ny] = visited[x][y] + 1
-                        queue.append((nx, ny))
-            # Fill min_moves[start_idx][j]
-            for j in range(n + 1):
-                x, y = pos_list[j]
-                min_moves[start_idx][j] = visited[x][y]
-        
-        # Precompute min_moves for all positions
-        for i in range(n + 1):
-            bfs(i)
-        
+                        visited[nx][ny] = d + 1
+                        q.append( (nx, ny) )
+                        # Check if this position is one of the targets
+                        for j in targets.copy():
+                            if positions_list[j] == (nx, ny):
+                                distances[i][j] = d + 1
+                                targets.remove(j)
+                                break  # To speed up
+            # At this point, distances[i][j] is filled for all j
         # Now implement DP with memoization
-        from sys import setrecursionlimit
-        setrecursionlimit(1 << 25)
-        
-        @lru_cache(maxsize=None)
-        def dp(current_idx, bitmask):
-            if bitmask == 0:
+        memo_size = (n+1) * (1 << n)
+        memo = [-1] * memo_size
+
+        def dp(last_pos, mask):
+            index = last_pos * (1 << n) + mask
+            if memo[index] != -1:
+                return memo[index]
+            if mask == 0:
+                memo[index] = 0
                 return 0
-            # Determine the player's turn
-            captured = n - bin(bitmask).count('1')
-            is_alice = (captured % 2 == 0)
-            if is_alice:
-                max_total = -1
-                for p in range(1, n + 1):
-                    if bitmask & (1 << (p - 1)):
-                        moves = min_moves[current_idx][p]
-                        if moves == -1:
-                            continue  # unreachable
-                        total = moves + dp(p, bitmask ^ (1 << (p - 1)))
-                        if total > max_total:
-                            max_total = total
-                return max_total if max_total != -1 else 0
+            # Determine whose turn it is
+            bits_set = bin(mask).count('1')
+            captured = n - bits_set
+            if captured % 2 == 0:
+                # Alice's turn: maximize the sum
+                max_sum = -float('inf')
+                for p in range(n):
+                    if mask & (1 << p):
+                        move = distances[last_pos][p+1]
+                        total = move + dp(p+1, mask ^ (1 << p))
+                        if total > max_sum:
+                            max_sum = total
+                memo[index] = max_sum
             else:
-                min_total = float('inf')
-                for p in range(1, n + 1):
-                    if bitmask & (1 << (p - 1)):
-                        moves = min_moves[current_idx][p]
-                        if moves == -1:
-                            continue  # unreachable
-                        total = moves + dp(p, bitmask ^ (1 << (p - 1)))
-                        if total < min_total:
-                            min_total = total
-                return min_total if min_total != float('inf') else 0
-        
-        # Initial bitmask: all pawns are present
-        initial_bitmask = (1 << n) - 1
-        return dp(0, initial_bitmask)
+                # Bob's turn: minimize the sum
+                min_sum = float('inf')
+                for p in range(n):
+                    if mask & (1 << p):
+                        move = distances[last_pos][p+1]
+                        total = move + dp(p+1, mask ^ (1 << p))
+                        if total < min_sum:
+                            min_sum = total
+                memo[index] = min_sum
+            return memo[index]
+
+        full_mask = (1 << n) -1
+        return dp(0, full_mask)
 ```
 
-### Explanation of the Code:
+### Explanation of the Code
 
-1. **Precomputing Minimum Moves**:
-    - We define all positions, including the starting position of the knight and the positions of all pawns.
-    - For each position, we perform BFS to compute the minimum number of moves required to reach every other position. These distances are stored in the `min_moves` matrix.
+1. **Precompute Distances:**
+   - We first compute the shortest path (minimum number of knight moves) from the starting position to each pawn and between all pairs of pawns using BFS. This information is stored in the `distances` matrix.
 
-2. **Dynamic Programming with Memoization**:
-    - The `dp` function takes the current position index and a bitmask representing the remaining pawns.
-    - It determines whose turn it is based on the number of pawns already captured.
-    - If it's Alice's turn, she selects the pawn that maximizes the total number of moves. If it's Bob's turn, he selects the pawn that minimizes the total number of moves.
-    - The function uses memoization (`@lru_cache`) to store and reuse results of subproblems, making the solution efficient.
+2. **Dynamic Programming with Memoization:**
+   - We initialize a memoization list `memo` to store the results of subproblems. Each state is uniquely identified by the current knight position (`last_pos`) and the set of remaining pawns (`mask`).
+   - The `dp` function recursively calculates the maximum total number of moves from the current state.
+   - Depending on whose turn it is (Alice or Bob), the function either maximizes or minimizes the total number of moves by exploring all possible pawn captures.
 
-3. **Handling Edge Cases**:
-    - The code handles cases where there might be unreachable pawns by skipping them.
-    - If no pawns are left, the function returns 0, as no more moves can be made.
+3. **Final Result:**
+   - We start the DP with the knight at the initial position (`last_pos = 0`) and all pawns present (`mask = full_mask`).
+   - The result returned by `dp(0, full_mask)` is the maximum total number of moves Alice can achieve when both players play optimally.
 
-### Testing the Solution:
+### Example Walkthrough
 
-Let's verify the solution with the provided examples:
+Let's consider **Example 1** from the problem statement:
 
-1. **Example 1**:
-    - **Input**: `kx = 1, ky = 1, positions = [[0,0]]`
-    - **Output**: `4`
-    - **Explanation**: The knight takes 4 moves to reach the pawn at (0,0).
+- **Input:** `kx = 1, ky = 1, positions = [[0,0]]`
+- **Output:** `4`
 
-2. **Example 2**:
-    - **Input**: `kx = 0, ky = 2, positions = [[1,1],[2,2],[3,3]]`
-    - **Output**: `8`
-    - **Explanation**: Alice and Bob alternate choosing pawns to maximize and minimize the total number of moves, resulting in a total of 8 moves.
+**Explanation:**
 
-3. **Example 3**:
-    - **Input**: `kx = 0, ky = 0, positions = [[1,2],[2,4]]`
-    - **Output**: `3`
-    - **Explanation**: Regardless of the order in which Alice and Bob choose the pawns, the total number of moves will be 3.
+- There's only one pawn at `(0,0)`.
+- The knight starts at `(1,1)`.
+- It takes 4 moves for the knight to reach `(0,0)`.
+- Since Alice captures the only pawn, the total number of moves is 4.
 
-The implemented solution correctly handles these cases and efficiently computes the maximum total number of moves.
+The provided solution correctly computes this result by precomputing the distance and using the DP approach to accumulate the total number of moves.
+
+### Conclusion
+
+This DP approach efficiently solves the problem by leveraging memoization and precomputing necessary distances. It ensures that all possible game states are considered while optimizing for both Alice's and Bob's strategies.

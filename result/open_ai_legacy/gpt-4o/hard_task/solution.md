@@ -4,9 +4,9 @@ Here's a step-by-step approach to solve the problem:
 
 1. **Breadth-First Search (BFS) for Knight Moves**: We need a function to calculate the minimum number of moves required for the knight to reach any given position on the board. This can be efficiently done using BFS.
 
-2. **Dynamic Programming with Minimax Strategy**: We use dynamic programming to simulate the game optimally. We need to keep track of the state of the game (i.e., the current position of the knight and the remaining pawns) and use a minimax strategy to decide the optimal moves for both players.
+2. **Dynamic Programming with Memoization**: Since both players play optimally, we can use dynamic programming to store the results of subproblems (i.e., the minimum number of moves required to capture the remaining pawns from a given position).
 
-3. **Memoization**: To avoid recalculating the same states multiple times, we use memoization to store the results of previously computed states.
+3. **Recursive Function**: We will create a recursive function that simulates the game. This function will consider all possible moves for both players and use memoization to avoid redundant calculations.
 
 Here's the complete Python solution:
 
@@ -22,7 +22,7 @@ class Solution(object):
         :type positions: List[List[int]]
         :rtype: int
         """
-        knight_moves = [(2, 1), (2, -1), (-2, 1), (-2, -1),
+        knight_moves = [(2, 1), (2, -1), (-2, 1), (-2, -1), 
                         (1, 2), (1, -2), (-1, 2), (-1, -2)]
         
         def bfs(start_x, start_y):
@@ -38,27 +38,27 @@ class Solution(object):
                         queue.append((nx, ny))
             return dist
         
-        # Precompute distances from every position to every other position
-        distances = {}
-        for x in range(50):
-            for y in range(50):
-                distances[(x, y)] = bfs(x, y)
+        initial_dist = bfs(kx, ky)
         
         @lru_cache(None)
-        def dp(kx, ky, remaining_pawns):
-            if not remaining_pawns:
+        def dp(mask, x, y):
+            if mask == 0:
                 return 0
-            
-            remaining_pawns = tuple(sorted(remaining_pawns))
-            max_moves = 0
-            for i, (px, py) in enumerate(remaining_pawns):
-                new_remaining_pawns = remaining_pawns[:i] + remaining_pawns[i+1:]
-                moves = distances[(kx, ky)][px][py]
-                max_moves = max(max_moves, moves + dp(px, py, new_remaining_pawns))
-            return max_moves
+            min_moves = float('inf')
+            for i in range(len(positions)):
+                if mask & (1 << i):
+                    px, py = positions[i]
+                    dist = bfs(x, y)[px][py]
+                    min_moves = min(min_moves, dist + dp(mask ^ (1 << i), px, py))
+            return min_moves
         
-        initial_pawns = tuple(map(tuple, positions))
-        return dp(kx, ky, initial_pawns)
+        max_moves = 0
+        for i in range(len(positions)):
+            px, py = positions[i]
+            dist = initial_dist[px][py]
+            max_moves = max(max_moves, dist + dp((1 << len(positions)) - 1 ^ (1 << i), px, py))
+        
+        return max_moves
 
 # Example usage:
 # sol = Solution()
@@ -68,12 +68,10 @@ class Solution(object):
 ```
 
 ### Explanation:
-1. **BFS Function**: The `bfs` function calculates the minimum number of moves required for the knight to reach any position on the board from a given starting position. This is done using a BFS approach.
+1. **BFS Function**: The `bfs` function calculates the minimum number of moves required for the knight to reach any position on the board from a given starting position. This is done using a breadth-first search.
 
-2. **Precompute Distances**: We precompute the distances between all pairs of positions on the board using the `bfs` function and store them in a dictionary `distances`.
+2. **Dynamic Programming with Memoization**: The `dp` function uses memoization to store the results of subproblems. It takes a bitmask representing the remaining pawns and the current position of the knight. It recursively calculates the minimum number of moves required to capture all remaining pawns.
 
-3. **Dynamic Programming with Memoization**: The `dp` function uses memoization to store the results of previously computed states. It recursively calculates the maximum number of moves by considering all possible pawns that can be captured next and using the precomputed distances.
+3. **Main Logic**: The main logic iterates over all possible starting pawns and calculates the maximum number of moves Alice can achieve by starting with each pawn and playing optimally.
 
-4. **Initial Call**: The initial call to the `dp` function starts with the knight's initial position and the list of all pawns.
-
-This solution ensures that both players play optimally, and it calculates the maximum total number of moves made during the game.
+This solution ensures that both players play optimally and calculates the maximum total number of moves made during the game.
